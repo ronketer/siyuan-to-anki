@@ -16,8 +16,9 @@ class Config:
 
     # LLM Server Configuration (Ollama with Intel GPU via Vulkan)
     LLM_BASE_URL: str = os.getenv("LLM_BASE_URL", "http://127.0.0.1:11434/v1")
-    LLM_MODEL_ID: str = os.getenv("LLM_MODEL_ID", "qwen3.5:4b")
+    LLM_MODEL_ID: str = os.getenv("LLM_MODEL_ID", "qwen2.5-coder:3b")
     LLM_API_KEY: str = os.getenv("LLM_API_KEY", "placeholder")
+    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "ollama")
 
     # Siyuan Notes Configuration
     SIYUAN_API_URL: str = os.getenv(

@@ -221,7 +221,7 @@ When prompted, type: APPROVE / REJECT / or feedback{RESET}
             
             if source == 'Card_Reviewer':
                 if 'REJECTED' in content:
-                    logger.log_rejection(content)
+                    logger.log_rejection(source, content)
                 elif 'APPROVED' in content:
                     logger.log_agent_message(source, content, 'approval_check')
             elif source == 'Admin':
@@ -230,7 +230,7 @@ When prompted, type: APPROVE / REJECT / or feedback{RESET}
                     card_count = len(cards.get('cards', [])) if cards else 0
                     logger.log_approval(card_count)
                 else:
-                    logger.log_rejection(content)
+                    logger.log_rejection(source, content)
             else:
                 logger.log_agent_message(source, content, 'message')
 

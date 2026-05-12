@@ -59,7 +59,7 @@ Each run writes a **`logs/{timestamp}.json`** file with full execution trace:
 class PipelineLogger:
     def log_agent_message(agent: str, content: str, type: str) -> None
     def log_tool_call(agent: str, tool: str, input: dict, result: str) -> None
-    def log_rejection(reason: str) -> None  # Increments rejection_count, triggers guardrail at 2
+    def log_rejection(agent: str, reason: str) -> None  # Increments rejection_count, triggers guardrail at 2
     def save() -> Path  # Writes timestamped JSON file to logs/
 ```
 
@@ -194,7 +194,7 @@ Required settings:
 1. Start Ollama and pull a model:
    ```bash
    ollama serve  # if not already running
-   ollama pull qwen3.5:4b  # recommended for function calling
+   ollama pull qwen2.5-coder:3b  # recommended for function calling
    ```
 2. Start Siyuan Notes
 3. Start Anki (with AnkiConnect running)
@@ -277,7 +277,7 @@ Best for local inference with GPU acceleration:
 
 ```env
 LLM_BASE_URL=http://127.0.0.1:11434/v1
-LLM_MODEL_ID=qwen3:4b
+LLM_MODEL_ID=qwen2.5-coder:3b
 ```
 
 > ⚠️ **Model Size Warning**: Models smaller than ~4B parameters may not follow multi-agent workflows correctly. They tend to skip agents, ignore the reflection loop, or call tools with placeholder values. Use 4B+ parameter models for reliable results.
@@ -317,3 +317,4 @@ LLM_MODEL_ID=your-model-name
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
+

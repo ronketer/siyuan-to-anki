@@ -68,7 +68,8 @@ def create_model_client() -> OpenAIChatCompletionClient:
     """Create the LLM client configured for the local inference server."""
     # Detect if using Gemini API (for demo with better responses)
     is_gemini = "generativelanguage.googleapis.com" in config.LLM_BASE_URL
-    
+    is_ollama = config.LLM_PROVIDER.lower() == "ollama"
+
     return OpenAIChatCompletionClient(
         model=config.LLM_MODEL_ID,
         base_url=config.LLM_BASE_URL,
@@ -80,8 +81,8 @@ def create_model_client() -> OpenAIChatCompletionClient:
             "structured_output": is_gemini,
             "family": "unknown",
         },
-        # Disable qwen3.5 "thinking mode" for faster responses
-        extra_create_args={"options": {"num_ctx": 4096}} if not is_gemini else {},
+        # Disable qwen "thinking mode" for faster responses
+        extra_create_args={"options": {"num_ctx": 4096}} if is_ollama and not is_gemini else {},
     )
 
 
@@ -140,6 +141,15 @@ def selector_func(messages: list) -> str | None:
     if last.source == "Card_Reviewer":
         if "APPROVED" in last.content:
             return "Admin"
+
+        # Guardrail: If Reviewer has rejected 2+ times, escalate to Admin
+        rejection_count = sum(
+            1 for m in messages 
+            if getattr(m, "source", None) == "Card_Reviewer" and "REJECTED" in str(m.content)
+        )
+        if rejection_count >= 2:
+            return "Admin"
+
         return "Card_Writer"
 
     # Human approves -> Manager saves; Human rejects -> Writer revises

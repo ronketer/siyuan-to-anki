@@ -64,7 +64,7 @@ def fetch_siyuan_notes(
         return f"Error fetching notes: {str(e)}"
 
 
-def push_to_anki(
+def _push_to_anki(
     front_text: Annotated[str, "The text for the front of the flashcard."],
     back_text: Annotated[str, "The text for the back of the flashcard."],
 ) -> str:
@@ -102,26 +102,26 @@ def push_cards_batch(
     ],
 ) -> str:
     """Push multiple flashcards to Anki in one batch.
-    
+
     Use this to save all approved cards at once.
     """
     import json as json_module
-    
+
     try:
         data = json_module.loads(cards_json)
         cards = data.get('cards', [])
     except json_module.JSONDecodeError:
         return "Error: Invalid JSON"
-    
+
     if not cards:
         return "Error: No cards found in JSON"
-    
+
     results = []
     for i, card in enumerate(cards, 1):
         front = card.get('front', card.get('question', ''))
         back = card.get('back', card.get('answer', ''))
         if front and back:
-            result = push_to_anki(front, back)
+            result = _push_to_anki(front, back)
             results.append(f"Card {i}: {result}")
-    
+
     return f"Saved {len(results)} cards:\n" + "\n".join(results)

@@ -22,9 +22,9 @@ class PipelineLogger:
         Args:
             run_id: Optional custom run ID. If None, uses timestamp.
         """
-        self.run_id = run_id or datetime.now().isoformat()
+        self.run_id = run_id or datetime.now().isoformat().replace(":", "-")
         self.log_dir = Path("logs")
-        self.log_dir.mkdir(exist_ok=True)
+        self.log_dir.mkdir(parents=True, exist_ok=True)
 
         self.log_file = self.log_dir / f"{self.run_id}.json"
         self.entries: list[dict[str, Any]] = []
@@ -79,15 +79,17 @@ class PipelineLogger:
         }
         self.entries.append(entry)
 
-    def log_rejection(self, reason: str = "") -> None:
+    def log_rejection(self, agent_name: str, reason: str = "") -> None:
         """Log a card rejection and increment the rejection counter.
 
         Args:
+            agent_name: Name of the agent that performed the rejection
             reason: Optional explanation for the rejection
         """
         self.rejection_count += 1
         entry = {
             "timestamp": datetime.now().isoformat(),
+            "agent": agent_name,
             "type": "rejection",
             "rejection_count": self.rejection_count,
             "reason": reason,
