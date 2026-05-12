@@ -206,7 +206,7 @@ LLM_MODEL_ID=your-model-name
 - [Pydantic](https://docs.pydantic.dev/) - Data validation and structured output
 - [Ollama](https://ollama.com/) - Local LLM inference with GPU acceleration (Intel, NVIDIA, AMD)
 - [Siyuan Notes](https://b3log.org/siyuan/) - Local-first knowledge management
-- [AnkiConnect](https://foosoft.net/projects/anki-connect/) - Anki automation API
+- [AnkiConnect](https://ankiweb.net/shared/info/2055492159) - Anki automation API
 
 ## License
 
