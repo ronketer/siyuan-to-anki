@@ -25,9 +25,12 @@ import sys
 from autogen_agentchat.conditions import MaxMessageTermination, TextMentionTermination
 from autogen_agentchat.teams import SelectorGroupChat
 from autogen_agentchat.ui import Console
+from pydantic import ValidationError
 
 from src.anki_pipeline.agents import create_agents, create_model_client, selector_func
 from src.anki_pipeline.config import config
+from src.anki_pipeline.logger import PipelineLogger
+from src.anki_pipeline.models import FlashcardList
 
 
 def parse_args() -> argparse.Namespace:
@@ -118,6 +121,9 @@ def format_agent_message(source: str, content: str) -> str:
 
 async def main() -> int:
     '''Run the flashcard generation pipeline.'''
+    # Initialize logger for observability
+    logger = PipelineLogger()
+    
     # Parse CLI arguments
     args = parse_args()
 
@@ -131,6 +137,8 @@ async def main() -> int:
         for error in errors:
             print(f'Configuration Error: {error}')
         print('\nPlease check your .env file.')
+        logger.log_outcome('error', saved_cards=0)
+        logger.save()
         return 1
 
     print(f'''
@@ -150,6 +158,7 @@ When prompted, type: APPROVE / REJECT / or feedback{RESET}
     # Pre-fetch content to work around models that struggle with tool calling
     from src.anki_pipeline.tools import fetch_siyuan_notes
     print(f'{DIM}Fetching content from Siyuan...{RESET}')
+    logger.log_agent_message('Knowledge_Manager', f'Fetching block {config.TARGET_BLOCK_ID}', 'tool_call')
     content = fetch_siyuan_notes(config.TARGET_BLOCK_ID)
 
     if 'Error' in content or 'error' in content.lower():
@@ -162,6 +171,12 @@ When prompted, type: APPROVE / REJECT / or feedback{RESET}
             data = json.loads(content)
             prefetched_content = data.get('kramdown', content)
             print(f'{GREEN}Content fetched successfully ({len(prefetched_content)} chars){RESET}\n')
+            logger.log_tool_call(
+                'Knowledge_Manager',
+                'fetch_siyuan_notes',
+                {'block_id': config.TARGET_BLOCK_ID},
+                f'Success ({len(prefetched_content)} chars)'
+            )
         except json.JSONDecodeError:
             prefetched_content = content
 
@@ -198,6 +213,27 @@ When prompted, type: APPROVE / REJECT / or feedback{RESET}
     # Run pipeline and capture result
     result = await Console(team.run_stream(task=task))
 
+    # Log all messages from the pipeline
+    for msg in result.messages:
+        if hasattr(msg, 'source') and hasattr(msg, 'content'):
+            source = msg.source
+            content = str(msg.content)[:500]  # Truncate for logging
+            
+            if source == 'Card_Reviewer':
+                if 'REJECTED' in content:
+                    logger.log_rejection(content)
+                elif 'APPROVED' in content:
+                    logger.log_agent_message(source, content, 'approval_check')
+            elif source == 'Admin':
+                if 'APPROVE' in content.upper():
+                    cards = extract_json_cards(str(msg.content))
+                    card_count = len(cards.get('cards', [])) if cards else 0
+                    logger.log_approval(card_count)
+                else:
+                    logger.log_rejection(content)
+            else:
+                logger.log_agent_message(source, content, 'message')
+
     # Fallback: If model didn't properly call push_cards_batch, do it manually
     # This handles smaller models that output pseudo-function-calls as text
     cards_saved = False
@@ -220,13 +256,35 @@ When prompted, type: APPROVE / REJECT / or feedback{RESET}
         for m in result.messages
     )
 
+    saved_card_count = 0
     if admin_approved and not cards_saved and final_cards:
-        print(f'\n{YELLOW}Saving cards (fallback)...{RESET}')
-        from src.anki_pipeline.tools import push_cards_batch
-        save_result = push_cards_batch(json.dumps(final_cards))
-        print(f'{GREEN}{save_result}{RESET}')
+        # Validate cards against Pydantic schema
+        try:
+            validated = FlashcardList.model_validate({"cards": final_cards.get('cards', [])})
+            final_cards = {"cards": [c.model_dump() for c in validated.cards]}
+        except ValidationError as e:
+            print(f'{YELLOW}Validation error: {e}{RESET}')
+            logger.log_agent_message('Knowledge_Manager', f'Validation failed: {str(e)}', 'error')
+            final_cards = None
+
+        if final_cards:
+            print(f'\n{YELLOW}Saving cards (validated)...{RESET}')
+            from src.anki_pipeline.tools import push_cards_batch
+            save_result = push_cards_batch(json.dumps(final_cards))
+            print(f'{GREEN}{save_result}{RESET}')
+            saved_card_count = len(final_cards.get('cards', []))
+            logger.log_tool_call(
+                'Knowledge_Manager',
+                'push_cards_batch',
+                {'cards': final_cards},
+                save_result
+            )
 
     print(f'\n{CYAN}Pipeline complete.{RESET}')
+    logger.log_outcome('success', saved_cards=saved_card_count)
+    log_path = logger.save()
+    print(f'{DIM}Log saved: {log_path}{RESET}')
+    
     return 0
 
 
